@@ -37,8 +37,24 @@ C:\nssm\nssm-2.25\win64\nssm.exe install MinIO "C:\start-minio.bat"
 C:\nssm\win64\nssm.exe set MinIO AppDirectory "C:\"
 C:\nssm\win64\nssm.exe start MinIO
 ```
+### 4. Настройка брандмауэра
 
-### 4. **Проверка доступа**
+```powershell
+# Открой порт 9000 (MinIO API — для S3-клиентов и FastAPI)
+New-NetFirewallRule -DisplayName "MinIO API" -Direction Inbound -LocalPort 9000 -Protocol TCP -Action Allow
+
+# Открой порт 9001 (MinIO Console — веб-интерфейс)
+New-NetFirewallRule -DisplayName "MinIO Console" -Direction Inbound -LocalPort 9001 -Protocol TCP -Action Allow
+```
+### Проверь, что правила созданы:
+
+```powershell
+Get-NetFirewallRule -DisplayName "MinIO*"
+```
+
+Должны появиться две записи со статусом `Enabled`.
+
+### 5. **Проверка доступа**
 
 После настройки:
 
