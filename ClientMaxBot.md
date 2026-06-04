@@ -284,10 +284,10 @@ C:\nssm\nssm-2.24\win64\nssm.exe edit MaxBot
 
 **Шаг 3. Частые проблемы:**
 
-| Проблема | Решение |
-|----------|---------|
-| `Cannot find module` | Запустите `npm ci` заново |
+| Проблема                 | Решение                                               |
+| ------------------------ | ----------------------------------------------------- |
+| `Cannot find module`     | Запустите `npm ci` заново                             |
 | `ECONNREFUSED` к API_URL | Проверьте, что FastAPI запущен: `Get-Service FastAPI` |
-| `401 Unauthorized` к API | Проверьте `API_KEY` в `.env` |
-| Бот не отвечает в MAX | Проверьте `BOT_TOKEN` — возможно, он истёк |
-| `node не найден` | Проверьте PATH в `start-maxbot.bat` |
+| `401 Unauthorized` к API | Проверьте `API_KEY` в `.env`                          |
+| Бот не отвечает в MAX    | Проверьте `BOT_TOKEN` — возможно, он истёк            |
+| `node не найден`         | Проверьте PATH в `start-maxbot.bat`                   |

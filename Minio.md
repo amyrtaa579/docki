@@ -33,9 +33,9 @@ Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "C:\nssm
 Expand-Archive -Path "C:\nssm.zip" -DestinationPath "C:\nssm"
 
 # Установите MinIO как службу
-C:\nssm\nssm-2.25\win64\nssm.exe install MinIO "C:\start-minio.bat"
-C:\nssm\win64\nssm.exe set MinIO AppDirectory "C:\"
-C:\nssm\win64\nssm.exe start MinIO
+C:\nssm\nssm-2.24\win64\nssm.exe install MinIO "C:\start-minio.bat"
+C:\nssm\nssm-2.24\win64\nssm.exe set MinIO AppDirectory "C:\"
+C:\nssm\nssm-2.24\win64\nssm.exe start MinIO
 ```
 ### 4. Настройка брандмауэра
 
