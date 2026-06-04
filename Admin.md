@@ -1,67 +1,54 @@
-# 🚀 Полная установка Admin Panel с нуля
-
-Административная панель для управления контентом Томского промышленно-гуманитарного колледжа (ТПГК).
-
-> ⚠️ **Важно:** В этой инструкции мы установим **всё с нуля** — от Node.js до запуска службы с Nginx reverse proxy.
+Отлично! На основе README и вашего стека напишу подробную документацию по развёртыванию Admin Panel на Windows Server, в том же стиле, что и предыдущие инструкции.
 
 ---
 
-## 📦 1. Установка Node.js 20 LTS
+# 🎨 Установка Anmicius Admin Panel на Windows Server
 
-> 💡 Если Node.js уже установлен (для MAX-бота) — пропустите этот шаг.
+## 📋 Принцип работы
 
-```powershell
-# Скачайте Node.js 20 LTS (официальный установщик)
-Invoke-WebRequest -Uri "https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi" -OutFile "C:\nodejs-installer.msi"
+Admin Panel — это **React SPA** (Single Page Application). После сборки она превращается в набор статических файлов (HTML, JS, CSS), которые нужно раздавать через веб-сервер и проксировать API-запросы к FastAPI бэкенду.
 
-# Запустите установщик
-Start-Process msiexec.exe -ArgumentList "/i C:\nodejs-installer.msi /qn" -Wait
+Мы настроим это через **Nginx для Windows** — он будет:
+1. Раздавать статические файлы админ-панели (порт **3000**)
+2. Проксировать запросы `/api/*`, `/auth/*`, `/admin/*` на FastAPI (порт **8000**)
+
+```
+Браузер → :3000 (Nginx) → статика (React SPA)
+                           → /api/* → :8000 (FastAPI)
+                           → /auth/* → :8000 (FastAPI)
+                           → /admin/* → :8000 (FastAPI)
 ```
 
-**Обязательно перезапустите PowerShell** после установки!
+---
 
-### Проверьте установку
+## 📦 1. Установка Node.js
+
+Node.js нужен для сборки React-приложения.
 
 ```powershell
-node -v
-# Должно вывести: v20.18.1
+# Скачайте Node.js 20 LTS (рекомендуемая версия)
+Invoke-WebRequest -Uri "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi" -OutFile "C:\nodejs-installer.msi"
 
-npm -v
+# Установите тихо (silent install)
+Start-Process msiexec.exe -ArgumentList "/i C:\nodejs-installer.msi /quiet /norestart" -Wait
+
+# Перезапустите PowerShell и проверьте
+node --version
+# Должно вывести: v20.11.0
+
+npm --version
 # Должно вывести: 10.x.x
 ```
 
 ---
 
-## 📦 2. Установка Git
-
-> 💡 Если Git уже установлен (для FastAPI) — пропустите этот шаг.
-
-```powershell
-# Скачайте установщик Git
-Invoke-WebRequest -Uri "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe" -OutFile "C:\git-installer.exe"
-
-# Запустите установщик
-Start-Process "C:\git-installer.exe"
-```
-
-В установщике можно просто нажимать **"Next"** везде.
-
-**Перезапустите PowerShell!**
-
-```powershell
-git --version
-# Должно вывести: git version 2.47.1
-```
-
----
-
-## 📥 3. Клонирование репозитория
+## 📥 2. Клонирование репозитория
 
 ```powershell
 # Перейдите в корень диска
 cd C:\
 
-# Клонируйте репозиторий
+# Клонируйте репозиторий админ-панели
 git clone https://github.com/amyrtaa579/tpgk-admin.git
 
 # Перейдите в папку проекта
@@ -70,122 +57,76 @@ cd C:\tpgk-admin
 
 ---
 
-## 📚 4. Установка зависимостей
+## ⚙️ 3. Настройка API-прокси для продакшена
 
-### Вариант 1: Первый запуск (нет `package-lock.json`)
+В продакшене прокси Vite не работает (он только для разработки). Поэтому настроим прокси через переменную окружения.
 
-```powershell
-npm install
-```
-
-После этой команды появится файл `package-lock.json`.
-
-### Вариант 2: Повторный запуск (есть `package-lock.json`)
+### 3.1. Проверьте текущий api.ts
 
 ```powershell
-npm ci
+# Откройте файл для просмотра
+notepad C:\tpgk-admin\src\services\api.ts
 ```
 
-### 📝 Разница между командами
-
-| Команда | Когда использовать |
-|---------|-------------------|
-| `npm install` | Первый запуск, когда нет `package-lock.json` |
-| `npm ci` | CI/CD, продакшен (когда есть `package-lock.json`) |
-
-> ⏳ Установка может занять 2-5 минут.
-
----
-
-## 🔨 5. Сборка проекта для продакшена
-
-```powershell
-# Соберите проект
-npm run build
-```
-
-После этого появится папка `dist` с готовыми статическими файлами.
-
-### ⚠️ Если сборка падает с ошибкой `@react-aria/ssr`
-
-Это известная проблема с зависимостями. Решение — обновить `vite.config.ts`:
-
-```powershell
-# Откройте конфиг
-notepad vite.config.ts
-```
-
-Замените **всё содержимое** на:
+Убедитесь, что `API_BASE_URL` выглядит так:
 
 ```typescript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 3000,
-    proxy: {
-      '/api': 'http://localhost:8000',
-      '/auth': 'http://localhost:8000',
-      '/admin': 'http://localhost:8000',
-    }
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['bootstrap', 'react-bootstrap']
-        }
-      }
-    }
-  },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom']
-  }
-})
+const API_BASE_URL = '/api/v1';
 ```
 
-Сохраните и повторите сборку:
-
-```powershell
-# Очистите кэш Vite
-Remove-Item -Recurse -Force node_modules\.vite -ErrorAction SilentlyContinue
-
-# Соберите заново
-npm run build
-```
+> 💡 **Важно:** именно `/api/v1` (относительный путь), а не `http://localhost:8000/api/v1`.  
+> Так запросы будут идти на тот же домен/порт, где крутится админ-панель, а Nginx проксирует их на FastAPI.
 
 ---
 
-## 🌐 6. Установка Nginx для Windows
+## 📦 4. Установка зависимостей и сборка
 
-Nginx будет работать как:
-- Веб-сервер для раздачи статических файлов (React приложение)
-- Reverse proxy для проксирования API запросов к FastAPI
+```powershell
+# Убедитесь, что вы в папке проекта
+cd C:\tpgk-admin
 
-### 6.1. Скачайте Nginx
+# Установите все зависимости
+npm install
+
+# Запустите сборку для продакшена
+npm run build
+```
+
+После успешной сборки появится папка `dist/`:
+
+```powershell
+# Проверьте, что папка dist создалась
+Get-ChildItem C:\tpgk-admin\dist
+```
+
+Должны быть файлы: `index.html`, папка `assets/` с JS и CSS.
+
+---
+
+## 🌐 5. Установка и настройка Nginx для Windows
+
+### 5.1. Скачайте Nginx
 
 ```powershell
 # Скачайте Nginx для Windows
-Invoke-WebRequest -Uri "http://nginx.org/download/nginx-1.26.3.zip" -OutFile "C:\nginx.zip"
+Invoke-WebRequest -Uri "https://nginx.org/download/nginx-1.24.0.zip" -OutFile "C:\nginx.zip"
 
 # Распакуйте
-Expand-Archive -Path "C:\nginx.zip" -DestinationPath "C:\nginx" -Force
+Expand-Archive -Path "C:\nginx.zip" -DestinationPath "C:\" -Force
+# После распаковки папка будет: C:\nginx-1.24.0
+
+# Переименуйте для удобства
+Rename-Item -Path "C:\nginx-1.24.0" -NewName "nginx"
 ```
 
-### 6.2. Настройте Nginx
+### 5.2. Настройте конфиг Nginx
 
 ```powershell
-# Откройте конфигурационный файл
-notepad "C:\nginx\nginx-1.26.3\conf\nginx.conf"
+# Откройте конфиг для редактирования
+notepad C:\nginx\nginx-1.26.3\conf\nginx.conf
 ```
 
-**Удалите всё содержимое** и вставьте следующее:
+**Полностью замените содержимое** на это:
 
 ```nginx
 worker_processes  1;
@@ -201,19 +142,22 @@ http {
     keepalive_timeout  65;
 
     server {
-        listen       80;
-        server_name  localhost;
+        listen       3000;
+        server_name  _;
+        
+        # Максимальный размер загружаемого файла
+        client_max_body_size 100M;
 
-        # Корневая папка с собранным React приложением
-        root   "C:/tpgk-admin/dist";
+        # Статические файлы админ-панели
+        root   C:/tpgk-admin/dist;
         index  index.html;
 
-        # SPA routing - все запросы перенаправляем на index.html
+        # SPA routing — все не-файловые запросы направляем на index.html
         location / {
             try_files $uri $uri/ /index.html;
         }
 
-        # Proxy API запросов к FastAPI
+        # Проксирование API-запросов на FastAPI
         location /api/ {
             proxy_pass http://127.0.0.1:8000;
             proxy_set_header Host $host;
@@ -222,7 +166,6 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        # Proxy auth запросов к FastAPI
         location /auth/ {
             proxy_pass http://127.0.0.1:8000;
             proxy_set_header Host $host;
@@ -231,7 +174,6 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        # Proxy admin API запросов к FastAPI
         location /admin/ {
             proxy_pass http://127.0.0.1:8000;
             proxy_set_header Host $host;
@@ -239,50 +181,57 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
         }
-
-        # Кэширование статических файлов
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
     }
 }
 ```
 
-Сохраните файл.
+> 💡 **Обратите внимание:** пути в `root` используют **прямые слэши** `/` (даже на Windows), а буква диска — заглавная `C:`.
 
-### 6.3. Проверьте конфигурацию
+### 5.3. Проверьте конфиг
 
 ```powershell
-# Перейдите в папку Nginx
-cd "C:\nginx\nginx-1.26.3"
-
-# Проверьте конфигурацию
+# Проверьте синтаксис конфигурации
+cd C:\nginx\nginx-1.26.3
 .\nginx.exe -t
 ```
 
 Должно вывести:
 ```
-nginx: the configuration file C:\nginx\nginx-1.26.3/conf/nginx.conf syntax is ok
-nginx: configuration file C:\nginx\nginx-1.26.3/conf/nginx.conf test is successful
+nginx: the configuration file C:\nginx/conf/nginx.conf syntax is ok
+nginx: configuration file C:\nginx/conf/nginx.conf test is successful
 ```
 
 ---
 
-## 🛠 7. Установка Nginx как службы Windows
+## 🔥 6. Откройте порт в брандмауэре
 
 ```powershell
-# Если NSSM ещё нет
+# Откройте порт 3000 для админ-панели
+New-NetFirewallRule -DisplayName "Admin Panel (Nginx)" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+```
+
+Проверьте:
+
+```powershell
+Get-NetFirewallRule -DisplayName "Admin Panel*"
+```
+
+---
+
+## 🛠 7. Установка Nginx как службы Windows (через NSSM)
+
+```powershell
+# Если NSSM ещё нет — скачайте
 if (-not (Test-Path "C:\nssm")) {
     Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile "C:\nssm.zip"
     Expand-Archive -Path "C:\nssm.zip" -DestinationPath "C:\nssm"
 }
 
 # Установите Nginx как службу
-C:\nssm\nssm-2.24\win64\nssm.exe install Nginx "C:\nginx\nginx-1.26.3\nginx.exe"
-C:\nssm\nssm-2.24\win64\nssm.exe set Nginx AppDirectory "C:\nginx\nginx-1.26.3"
+C:\nssm\nssm-2.24\win64\nssm.exe install Nginx "C:\nginx\nginx.exe"
+C:\nssm\nssm-2.24\win64\nssm.exe set Nginx AppDirectory "C:\nginx"
 C:\nssm\nssm-2.24\win64\nssm.exe set Nginx DisplayName "Nginx Web Server"
-C:\nssm\nssm-2.24\win64\nssm.exe set Nginx Description "Nginx for TPGK Admin Panel"
+C:\nssm\nssm-2.24\win64\nssm.exe set Nginx Description "Nginx for Admin Panel"
 C:\nssm\nssm-2.24\win64\nssm.exe set Nginx Start SERVICE_AUTO_START
 
 # Запустите службу
@@ -291,77 +240,44 @@ C:\nssm\nssm-2.24\win64\nssm.exe start Nginx
 
 ---
 
-## 🔥 8. Открытие порта в брандмауэре
+## ▶️ 8. Проверка работы
 
-```powershell
-# Откройте порт 80 (HTTP) для доступа к админ-панели
-New-NetFirewallRule -DisplayName "Nginx HTTP" -Direction Inbound -LocalPort 80 -Protocol TCP -Action Allow
-```
-
-### Проверьте правило
-
-```powershell
-Get-NetFirewallRule -DisplayName "Nginx HTTP"
-```
-
----
-
-## ✅ 9. Проверка работы
+### 8.1. Локальные проверки
 
 ```powershell
 # Проверьте статус службы Nginx
 Get-Service Nginx
 # Должно быть: Status: Running
 
-# Проверьте, что порт 80 слушается
-netstat -ano | findstr ":80 "
-# Должна быть строка: TCP  0.0.0.0:80  ...  LISTENING
+# Проверьте, что порт 3000 слушается
+netstat -ano | findstr ":3000"
+# Должна быть строка: TCP  0.0.0.0:3000  ...  LISTENING
 
-# Проверьте локально
-Invoke-WebRequest -Uri "http://localhost"
+# Проверьте локально через curl (если есть) или PowerShell
+Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing
+# Должен вернуть HTML-код админ-панели (статус 200)
+```
 
-# Проверьте с удалённой машины
-Test-NetConnection -ComputerName 72.56.6.8 -Port 80
+### 8.2. Проверка с удалённой машины
+
+```powershell
+Test-NetConnection -ComputerName 72.56.6.8 -Port 3000
 # Должно быть: TcpTestSucceeded : True
 ```
 
-### Откройте в браузере
+### 8.3. Откройте в браузере
 
-На **любом устройстве**:
+На **любом устройстве** в сети:
 
 ```
-http://72.56.6.8
+http://72.56.6.8:3000
 ```
 
-Должна открыться **страница входа** в админ-панель. 🎉
-
-Войдите с учётными данными администратора (которого создали при настройке FastAPI).
+Должна открыться страница входа в админ-панель. 🎉
 
 ---
 
-## 🔧 10. Управление службами
-
-```powershell
-# Остановить Nginx
-C:\nssm\nssm-2.24\win64\nssm.exe stop Nginx
-
-# Перезапустить Nginx
-C:\nssm\nssm-2.24\win64\nssm.exe restart Nginx
-
-# Перезагрузить конфигурацию Nginx (без остановки)
-cd "C:\nginx\nginx-1.26.3"
-.\nginx.exe -s reload
-
-# Удалить службу
-C:\nssm\nssm-2.24\win64\nssm.exe remove Nginx confirm
-
-# Открыть GUI для редактирования
-C:\nssm\nssm-2.24\win64\nssm.exe edit Nginx
-```
-
----
-
-## 🔄 11. Обновление админ-панели
+## 🔄 9. Обновление админ-панели
 
 Когда вышли новые изменения в репозитории:
 
@@ -369,49 +285,75 @@ C:\nssm\nssm-2.24\win64\nssm.exe edit Nginx
 # Перейдите в папку проекта
 cd C:\tpgk-admin
 
+# Остановите Nginx (пока пересобираем)
+C:\nssm\nssm-2.24\win64\nssm.exe stop Nginx
+
 # Скачайте обновления
 git pull
 
 # Установите новые зависимости (если появились)
-npm ci
+npm install
 
 # Пересоберите проект
 npm run build
 
-# Перезагрузите Nginx (не обязательно, но желательно)
-cd "C:\nginx\nginx-1.26.3"
-.\nginx.exe -s reload
+# Запустите Nginx обратно
+C:\nssm\nssm-2.24\win64\nssm.exe start Nginx
 ```
 
-> 💡 Nginx не нужно останавливать — он просто раздаёт файлы из папки `dist/`, которая обновляется при сборке.
+> 💡 Nginx останавливаем на время сборки, чтобы старые файлы не кэшировались. Сама сборка занимает ~30-60 секунд.
 
 ---
 
-## 📋 Итого
+## 🔧 10. Управление службой Nginx
 
-| Компонент | Статус | Путь / URL |
-|-----------|--------|------------|
-| Node.js 20 LTS | ✅ Установлен | Системный PATH |
-| Git | ✅ Установлен | Системный PATH |
-| Код Admin Panel | ✅ `C:\tpgk-admin` | Клонирован из GitHub |
-| Сборка | ✅ `C:\tpgk-admin\dist` | Готовые статические файлы |
-| Nginx | ✅ `C:\nginx\nginx-1.26.3` | Reverse proxy + web server |
-| Служба Nginx | ✅ Запущена через NSSM | Автозапуск при загрузке Windows |
-| Порт 80 | ✅ Открыт в брандмауэре | `http://72.56.6.8` |
-| Admin Panel | ✅ Доступна | `http://72.56.6.8` |
+```powershell
+# Остановить
+C:\nssm\nssm-2.24\win64\nssm.exe stop Nginx
+
+# Перезапустить (например, после изменения конфига)
+C:\nssm\nssm-2.24\win64\nssm.exe restart Nginx
+
+# Удалить службу (если нужно)
+C:\nssm\nssm-2.24\win64\nssm.exe remove Nginx confirm
+
+# Открыть GUI для просмотра логов
+C:\nssm\nssm-2.24\win64\nssm.exe edit Nginx
+```
+
+Во вкладке **I/O** можно посмотреть пути к логам Nginx (по умолчанию `C:\nginx\logs\`).
 
 ---
 
-## 🎯 Финальная проверка всей системы
+## 📋 11. Итоговая таблица всех сервисов
 
-| Сервис | URL | Как проверить |
-|--------|-----|---------------|
-| PostgreSQL | `72.56.6.8:5432` | Подключиться через pgAdmin/DBeaver |
-| MinIO Console | `http://72.56.6.8:9001` | Открыть в браузере |
-| Redis | `72.56.6.8:6379` | `redis-cli -h 72.56.6.8 ping` |
-| FastAPI Swagger | `http://72.56.6.8:8000/docs` | Открыть в браузере |
-| **Admin Panel** | `http://72.56.6.8` | Открыть в браузере |
-| MAX-бот | В мессенджере MAX | Написать боту `/start` |
+| Сервис | Порт | URL | Служба Windows |
+|--------|------|-----|----------------|
+| PostgreSQL | 5432 | `72.56.6.8:5432` | `PostgreSQL16` |
+| Redis | 6379 | `72.56.6.8:6379` | `Redis` |
+| MinIO API | 9000 | `http://72.56.6.8:9000` | `MinIO` |
+| MinIO Console | 9001 | `http://72.56.6.8:9001` | `MinIO` |
+| FastAPI | 8000 | `http://72.56.6.8:8000` | `FastAPI` |
+| **Admin Panel** | **3000** | **`http://72.56.6.8:3000`** | **`Nginx`** |
+
+---
+
+## 🧪 12. Финальная проверка всей системы
+
+```powershell
+# Все службы проекта
+Get-Service | Where-Object { $_.Name -match "FastAPI|PostgreSQL|Redis|MinIO|Nginx" }
+
+# Все порты проекта
+@(3000, 5432, 6379, 8000, 9000, 9001) | ForEach-Object {
+    $result = netstat -ano | Select-String ":$_ "
+    if ($result) {
+        Write-Host "✅ Порт $_ слушается" -ForegroundColor Green
+    } else {
+        Write-Host "❌ Порт $_ НЕ слушается" -ForegroundColor Red
+    }
+}
+```
 
 ---
 
@@ -420,161 +362,51 @@ cd "C:\nginx\nginx-1.26.3"
 ### Nginx не запускается
 
 ```powershell
-# Посмотрите статус
-Get-Service Nginx
+# Проверьте логи
+Get-Content C:\nginx\nginx-1.26.3\logs\error.log -Tail 30
 
-# Откройте GUI NSSM и посмотрите логи
-C:\nssm\nssm-2.24\win64\nssm.exe edit Nginx
+# Проверьте конфиг
+C:\nginx\nginx-1.26.3\nginx.exe -t
+
+# Частая проблема: порт 3000 уже занят
+netstat -ano | findstr ":3000"
 ```
 
-Во вкладке **"I/O"** указаны файлы логов — откройте их блокнотом.
+### Белый экран / 404 при обновлении страницы
 
-### Страница не открывается
+Убедитесь, что в конфиге Nginx есть `try_files $uri $uri/ /index.html;` — это нужно для SPA-роутинга.
+
+### API-запросы возвращают 404 или CORS-ошибку
+
+Проверьте, что FastAPI запущен на порту 8000:
 
 ```powershell
-# Проверьте, что Nginx запущен
-Get-Service Nginx
-
-# Проверьте, что порт 80 слушается
-netstat -ano | findstr ":80 "
-
-# Проверьте конфигурацию Nginx
-cd "C:\nginx\nginx-1.26.3"
-.\nginx.exe -t
-
-# Посмотрите логи Nginx
-Get-Content "C:\nginx\nginx-1.26.3\logs\error.log" -Tail 50
+netstat -ano | findstr ":8000"
 ```
 
-### API запросы не работают (404 или 502)
+И что в `api.ts` стоит относительный путь `/api/v1`, а не абсолютный URL.
+
+### Не загружаются изображения из MinIO
+
+Убедитесь, что в `.env` бэкенда правильно указаны `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`.
+
+### Порт 3000 не открыт снаружи
 
 ```powershell
-# Проверьте, что FastAPI запущен
-Get-Service FastAPI
+# Проверьте правило брандмауэра
+Get-NetFirewallRule -DisplayName "Admin Panel*" | Format-List
 
-# Проверьте, что FastAPI слушает порт 8000
-netstat -ano | findstr ":8000 "
-
-# Проверьте логи Nginx
-Get-Content "C:\nginx\nginx-1.26.3\logs\error.log" -Tail 50
-```
-
-### Сборка падает с ошибкой `@react-aria/ssr`
-
-Это проблема с зависимостями. Решение:
-
-1. Обновите `vite.config.ts` (см. раздел 5)
-2. Очистите кэш: `Remove-Item -Recurse -Force node_modules\.vite`
-3. Пересоберите: `npm run build`
-
-### `npm ci` выдаёт ошибку `npm ci can only install packages when your package.json and package-lock.json`
-
-Значит в репозитории нет `package-lock.json`. Используйте:
-
-```powershell
-npm install
-```
-
-### Частые проблемы
-
-| Проблема | Решение |
-|----------|---------|
-| `node не найден` | Перезапустите PowerShell после установки Node.js |
-| `npm не найден` | Перезапустите PowerShell |
-| `git не найден` | Перезапустите PowerShell после установки Git |
-| Порт 80 уже занят (IIS) | Остановите IIS: `Stop-Service W3SVC` или измените порт в `nginx.conf` |
-| 502 Bad Gateway при обращении к API | Проверьте, что FastAPI запущен: `Get-Service FastAPI` |
-| Белый экран после входа | Проверьте консоль браузера (F12) — возможно, проблема с API |
-| CORS ошибки | Проверьте настройки CORS в FastAPI (`app/main.py`) |
-| Изображения из MinIO не загружаются | Проверьте, что MinIO доступен и URL правильный в БД |
-| Ошибка сборки `@react-aria/ssr` | Обновите `vite.config.ts` (см. раздел 5) |
-| `npm ci` не работает | Используйте `npm install` вместо `npm ci` |
-
-### Полезные команды для диагностики
-
-```powershell
-# Все службы проекта
-Get-Service | Where-Object { $_.Name -match "FastAPI|PostgreSQL|Redis|MinIO|MaxBot|Nginx" }
-
-# Все открытые порты
-netstat -ano | findstr "LISTENING"
-
-# Проверить все порты проекта
-@(80, 5432, 6379, 8000, 9000, 9001) | ForEach-Object {
-    Write-Host "Port $_:" -ForegroundColor Cyan
-    netstat -ano | findstr ":$_ "
-}
-
-# Логи Nginx (ошибки)
-Get-Content "C:\nginx\nginx-1.26.3\logs\error.log" -Tail 100
-
-# Логи Nginx (доступ)
-Get-Content "C:\nginx\nginx-1.26.3\logs\access.log" -Tail 100
+# Проверьте, не блокирует ли внешний брандмауэр хостинга
 ```
 
 ---
 
-## 📝 Дополнительная информация
+## Контакты для связи
 
-### Изменение порта Nginx
-
-Если нужно запустить админ-панель на другом порту (например, 8080):
-
-1. Откройте `C:\nginx\nginx-1.26.3\conf\nginx.conf`
-2. Найдите строку: `listen 80;`
-3. Замените на: `listen 8080;`
-4. Перезагрузите Nginx: `.\nginx.exe -s reload`
-5. Откройте порт в брандмауэре: `New-NetFirewallRule -DisplayName "Nginx 8080" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow`
-
-### HTTPS (SSL)
-
-Для настройки HTTPS:
-
-1. Получите SSL сертификат (Let's Encrypt или купите)
-2. Добавьте в `nginx.conf`:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name admin.example.com;
-
-    ssl_certificate "C:/path/to/cert.pem";
-    ssl_certificate_key "C:/path/to/key.pem";
-
-    # ... остальная конфигурация
-}
-
-# Редирект с HTTP на HTTPS
-server {
-    listen 80;
-    server_name admin.example.com;
-    return 301 https://$server_name$request_uri;
-}
-```
-
-3. Откройте порт 443 в брандмауэре
-
-### Разработка (dev-режим)
-
-Для разработки можно запустить Vite dev-сервер:
-
-```powershell
-cd C:\tpgk-admin
-npm run dev
-```
-
-Админ-панель будет доступна на `http://localhost:3000` с горячей перезагрузкой.
-````
+- **FastAPI (Anmicius API)**: `http://72.56.6.8:8000/docs` — Swagger документация
+- **Admin Panel**: `http://72.56.6.8:3000` — веб-интерфейс управления
+- **MinIO Console**: `http://72.56.6.8:9001` — управление файлами
 
 ---
 
-## 📋 Что изменилось по сравнению с предыдущей версией
-
-| Раздел | Изменение |
-|--------|-----------|
-| **Раздел 4** | Разделён на два варианта: `npm install` (первый запуск) и `npm ci` (повторный) |
-| **Раздел 5** | Добавлен подраздел "Если сборка падает с ошибкой `@react-aria/ssr`" с решением через `vite.config.ts` |
-| **Раздел 11** | Упрощён — Nginx не нужно останавливать для обновления |
-| **Частые проблемы** | Добавлены 2 новые записи: про `@react-aria/ssr` и про `npm ci` |
-
-Теперь документация полностью отражает реальный опыт установки и все подводные камни, с которыми ты столкнулся. 🎯
+Теперь админ-панель должна быть доступна по `http://72.56.6.8:3000` и полностью готова к работе! Если возникнут вопросы при настройке — пишите.

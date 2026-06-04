@@ -37,7 +37,7 @@ C:\nssm\nssm-2.24\win64\nssm.exe install MinIO "C:\start-minio.bat"
 C:\nssm\nssm-2.24\win64\nssm.exe set MinIO AppDirectory "C:\"
 C:\nssm\nssm-2.24\win64\nssm.exe start MinIO
 ```
-### 4. Настройка брандмауэра
+### 4. Открываем порты
 
 ```powershell
 # Открой порт 9000 (MinIO API — для S3-клиентов и FastAPI)

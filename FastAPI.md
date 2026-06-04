@@ -113,37 +113,9 @@ pip install -r requirements.txt
 # Скопируйте пример файла окружения
 Copy-Item .env.example .env
 
-# Откройте .env в блокноте
+# Откройте .env в блокноте и отредактировать
 notepad .env
 ```
-
-Вставьте/отредактируйте содержимое:
-
-```env
-# База данных PostgreSQL
-DATABASE_URL=postgresql+asyncpg://postgres:postgres123@72.56.6.8:5432/tpgk
-
-# Redis
-REDIS_URL=redis://72.56.6.8:6379/0
-
-# MinIO (S3-хранилище)
-MINIO_ENDPOINT=72.56.6.8:9000
-MINIO_ACCESS_KEY=admin
-MINIO_SECRET_KEY=password123
-MINIO_SECURE=false
-
-# JWT-авторизация
-SECRET_KEY=your-super-secret-key-change-this
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-
-# Настройки приложения
-APP_HOST=0.0.0.0
-APP_PORT=8000
-DEBUG=false
-```
-
-> ⚠️ **Важно:** Замените `SECRET_KEY` на случайную длинную строку (например, сгенерируйте на [random.org](https://www.random.org/strings/)).
 
 ---
 
