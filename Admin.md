@@ -72,10 +72,26 @@ cd C:\tpgk-admin
 
 ## 📚 4. Установка зависимостей
 
+### Вариант 1: Первый запуск (нет `package-lock.json`)
+
 ```powershell
-# Установите все зависимости из package.json
+npm install
+```
+
+После этой команды появится файл `package-lock.json`.
+
+### Вариант 2: Повторный запуск (есть `package-lock.json`)
+
+```powershell
 npm ci
 ```
+
+### 📝 Разница между командами
+
+| Команда | Когда использовать |
+|---------|-------------------|
+| `npm install` | Первый запуск, когда нет `package-lock.json` |
+| `npm ci` | CI/CD, продакшен (когда есть `package-lock.json`) |
 
 > ⏳ Установка может занять 2-5 минут.
 
@@ -89,6 +105,60 @@ npm run build
 ```
 
 После этого появится папка `dist` с готовыми статическими файлами.
+
+### ⚠️ Если сборка падает с ошибкой `@react-aria/ssr`
+
+Это известная проблема с зависимостями. Решение — обновить `vite.config.ts`:
+
+```powershell
+# Откройте конфиг
+notepad vite.config.ts
+```
+
+Замените **всё содержимое** на:
+
+```typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    proxy: {
+      '/api': 'http://localhost:8000',
+      '/auth': 'http://localhost:8000',
+      '/admin': 'http://localhost:8000',
+    }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['bootstrap', 'react-bootstrap']
+        }
+      }
+    }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom']
+  }
+})
+```
+
+Сохраните и повторите сборку:
+
+```powershell
+# Очистите кэш Vite
+Remove-Item -Recurse -Force node_modules\.vite -ErrorAction SilentlyContinue
+
+# Соберите заново
+npm run build
+```
 
 ---
 
@@ -299,9 +369,6 @@ C:\nssm\nssm-2.24\win64\nssm.exe edit Nginx
 # Перейдите в папку проекта
 cd C:\tpgk-admin
 
-# Остановите Nginx
-C:\nssm\nssm-2.24\win64\nssm.exe stop Nginx
-
 # Скачайте обновления
 git pull
 
@@ -311,20 +378,12 @@ npm ci
 # Пересоберите проект
 npm run build
 
-# Запустите Nginx обратно
-C:\nssm\nssm-2.24\win64\nssm.exe start Nginx
-```
-
-Или проще — просто перезагрузите Nginx:
-
-```powershell
-cd C:\tpgk-admin
-git pull
-npm ci
-npm run build
+# Перезагрузите Nginx (не обязательно, но желательно)
 cd "C:\nginx\nginx-1.26.3"
 .\nginx.exe -s reload
 ```
+
+> 💡 Nginx не нужно останавливать — он просто раздаёт файлы из папки `dist/`, которая обновляется при сборке.
 
 ---
 
@@ -400,6 +459,22 @@ netstat -ano | findstr ":8000 "
 Get-Content "C:\nginx\nginx-1.26.3\logs\error.log" -Tail 50
 ```
 
+### Сборка падает с ошибкой `@react-aria/ssr`
+
+Это проблема с зависимостями. Решение:
+
+1. Обновите `vite.config.ts` (см. раздел 5)
+2. Очистите кэш: `Remove-Item -Recurse -Force node_modules\.vite`
+3. Пересоберите: `npm run build`
+
+### `npm ci` выдаёт ошибку `npm ci can only install packages when your package.json and package-lock.json`
+
+Значит в репозитории нет `package-lock.json`. Используйте:
+
+```powershell
+npm install
+```
+
 ### Частые проблемы
 
 | Проблема | Решение |
@@ -412,6 +487,8 @@ Get-Content "C:\nginx\nginx-1.26.3\logs\error.log" -Tail 50
 | Белый экран после входа | Проверьте консоль браузера (F12) — возможно, проблема с API |
 | CORS ошибки | Проверьте настройки CORS в FastAPI (`app/main.py`) |
 | Изображения из MinIO не загружаются | Проверьте, что MinIO доступен и URL правильный в БД |
+| Ошибка сборки `@react-aria/ssr` | Обновите `vite.config.ts` (см. раздел 5) |
+| `npm ci` не работает | Используйте `npm install` вместо `npm ci` |
 
 ### Полезные команды для диагностики
 
@@ -487,3 +564,17 @@ npm run dev
 ```
 
 Админ-панель будет доступна на `http://localhost:3000` с горячей перезагрузкой.
+````
+
+---
+
+## 📋 Что изменилось по сравнению с предыдущей версией
+
+| Раздел | Изменение |
+|--------|-----------|
+| **Раздел 4** | Разделён на два варианта: `npm install` (первый запуск) и `npm ci` (повторный) |
+| **Раздел 5** | Добавлен подраздел "Если сборка падает с ошибкой `@react-aria/ssr`" с решением через `vite.config.ts` |
+| **Раздел 11** | Упрощён — Nginx не нужно останавливать для обновления |
+| **Частые проблемы** | Добавлены 2 новые записи: про `@react-aria/ssr` и про `npm ci` |
+
+Теперь документация полностью отражает реальный опыт установки и все подводные камни, с которыми ты столкнулся. 🎯
